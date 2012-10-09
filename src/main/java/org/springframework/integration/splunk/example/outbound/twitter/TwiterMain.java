@@ -27,7 +27,7 @@ public class TwiterMain {
 	public static void main(String args[]) throws InterruptedException {
 
 		ClassPathXmlApplicationContext ctx = new ClassPathXmlApplicationContext(
-				"SpringSplunkShowcaseTwitter-context.xml", TwiterMain.class);
+				"SimpleSpringSplunkShowcaseTwitter-context.xml", TwiterMain.class);
 		ctx.start();
 
 	}

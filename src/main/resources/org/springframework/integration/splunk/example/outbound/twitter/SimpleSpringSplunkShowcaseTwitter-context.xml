@@ -19,32 +19,6 @@
 
 	<import resource="../../SplunkCommon-context.xml" />
 
-	<jdbc:embedded-database id="dataSource" type="DERBY" />
-
-	<jdbc:initialize-database data-source="dataSource"
-		ignore-failures="DROPS">
-		<jdbc:script
-			location="classpath:org/springframework/integration/jdbc/schema-drop-derby.sql" />
-		<jdbc:script
-			location="classpath:org/springframework/integration/jdbc/schema-derby.sql" />
-		<jdbc:script location="classpath:data.sql" />
-	</jdbc:initialize-database>
-
-	<bean id="personDAO"
-		class="org.springframework.integration.splunk.example.dao.PersonDAO">
-		<property name="dataSource" ref="dataSource" />
-	</bean>
-
-
-	<int-jdbc:message-store id="messageStore"
-		data-source="dataSource" table-prefix="INT_" />
-
-
-	<bean id="transactionManager"
-		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
-		<property name="dataSource" ref="dataSource" />
-	</bean>
-
 	<bean id="twitterTemplate"
 		class="org.springframework.social.twitter.api.impl.TwitterTemplate">
 		<constructor-arg value="${twitter.oauth.consumerKey}" />
@@ -54,33 +28,38 @@
 	</bean>
 
 
-	<int:publish-subscribe-channel id="input">
-	</int:publish-subscribe-channel>
-
-	<int:channel id="filterChannel">
+	<int:channel id="input">
+	     <int:interceptors>
+	         <int:wire-tap channel="logger"/>
+	     </int:interceptors>	
 	</int:channel>
-
-	<int:channel id="outputToSplunkWithMessageStore">
-		<int:queue message-store="messageStore" capacity="1000" />
-	</int:channel>
+	
+ 	<int:logging-channel-adapter id="logger" level="INFO" 
+ 		expression="'from:' + payload.getFromUser() + ',source:' + payload.getSource() + ',twitter data:' + payload.getText()"/>
+ 	
+	<int:channel id="output"/>
 
 	<int-twitter:search-inbound-channel-adapter id="searchAdapter" channel="input"
-		query="#voteobama OR #voteromney OR #votebieber">
+												query="#voteobama OR #voteromney OR #votebieber">
 		<int:poller fixed-rate="5000" max-messages-per-poll="50" />
 	</int-twitter:search-inbound-channel-adapter>
 
-<!-- 
-	<int-twitter:inbound-channel-adapter
-		twitter-template="twitterTemplate" channel="input">
-		<int:poller fixed-rate="5000" max-messages-per-poll="3" />
-	</int-twitter:inbound-channel-adapter>
--->
+	<int:chain input-channel="input" output-channel="outputToSplunk">
+		<int:filter ref="tweetFilter"/>
+		<int:transformer ref="splunkTransformer"/>
+	</int:chain>
 
-	<int:service-activator input-channel="input" ref="twitterDataHandler"></int:service-activator>
 
-	<int:filter input-channel="input" output-channel="filterChannel" ref="fromUserSelector"></int:filter>
 
-	<bean id="fromUserSelector"
+	<int-splunk:outbound-channel-adapter
+		id="splunkOutboundChannelAdapter" auto-startup="true" order="1"
+		channel="output" splunk-server-ref="splunkServer"	
+		pool-server-connection="true" sourceType="twitter-integration" source="twitter"
+		ingest="SUBMIT">
+	</int-splunk:outbound-channel-adapter>
+	
+	
+	<bean id="tweetFilter"
 		class="org.springframework.integration.splunk.example.outbound.twitter.FromUserSelector">
 		<property name="fromUsers">
 			<list>
@@ -90,21 +69,7 @@
 		</property>
 	</bean>
 
-	<int:transformer input-channel="filterChannel"
-		output-channel="outputToSplunkWithMessageStore" ref="splunkTransformer"></int:transformer>
-
 	<bean id="splunkTransformer"
 		class="org.springframework.integration.splunk.example.outbound.twitter.TwitterToSplunkTransformer" />
-
-	<int-splunk:outbound-channel-adapter
-		id="splunkOutboundChannelAdapter" auto-startup="true" order="1"
-		channel="outputToSplunkWithMessageStore" splunk-server-ref="splunkServer"	
-		pool-server-connection="true" sourceType="twitter-integration" source="twitter"
-		ingest="SUBMIT">
-		<int:poller fixed-rate="5" time-unit="SECONDS">
-			<int:transactional transaction-manager="transactionManager"
-				isolation="DEFAULT" propagation="REQUIRED" />
-		</int:poller>
-	</int-splunk:outbound-channel-adapter>
 
 </beans>

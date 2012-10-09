@@ -47,10 +47,13 @@ public class FromUserSelector implements MessageSelector, InitializingBean {
 	public boolean accept(Message<?> message) {
 		Tweet t = (Tweet) message.getPayload();
 		String from = t.getFromUser();
+		return true;
+		/*
 		if (fromUsers.contains(from)) {
 			return true;
 		}
 		return false;
+		*/
 	}
 
 	/* (non-Javadoc)
