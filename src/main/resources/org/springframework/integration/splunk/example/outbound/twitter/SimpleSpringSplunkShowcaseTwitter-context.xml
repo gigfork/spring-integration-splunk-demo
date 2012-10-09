@@ -44,12 +44,10 @@
 		<int:poller fixed-rate="5000" max-messages-per-poll="50" />
 	</int-twitter:search-inbound-channel-adapter>
 
-	<int:chain input-channel="input" output-channel="outputToSplunk">
+	<int:chain input-channel="input" output-channel="output">
 		<int:filter ref="tweetFilter"/>
 		<int:transformer ref="splunkTransformer"/>
 	</int:chain>
-
-
 
 	<int-splunk:outbound-channel-adapter
 		id="splunkOutboundChannelAdapter" auto-startup="true" order="1"
